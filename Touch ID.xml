@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?><extensionAttribute>
+<displayName>Touch ID</displayName>
+<description>Extension Attribute will detect if Mac hardware support's Touch ID, if not supported will update "UnSupported" and if Mac hardware supports Touch ID it will list User ID enrolled for Touch ID unlock or Touch ID is not enabled for unlock.</description>
+<dataType>string</dataType>
+<scriptContentsMac>#!/bin/zsh&#13;
+&#13;
+# This script will list all the users enrolled in Touch ID&#13;
+# that have "unlock with fingerprint" enabled.&#13;
+&#13;
+# First, check if the system even supports Touch ID&#13;
+# If not, bail out and report unsupported.&#13;
+&#13;
+touchIDfunctionality=$(/usr/bin/bioutil -rs | grep "Touch ID functionality")&#13;
+&#13;
+if [[ -z $touchIDfunctionality ]]&#13;
+then&#13;
+	echo "&lt;result&gt;Unsupported&lt;/result&gt;"&#13;
+	exit 0&#13;
+fi&#13;
+&#13;
+# Next, list all the users over UID 500 and run 'bioutil' with sudo -u .&#13;
+# Only capture users that have &gt; 0 fingerprints registered,&#13;
+# and finally confirm that they have enabled unlocking the Mac.&#13;
+&#13;
+tidEnrolledUsers=($(for i in $(ls -lan /Users/ | awk '$3 &gt; 500 { print $9 }'); do sudo -u $i /usr/bin/bioutil -c; done | awk '/User/ &amp;&amp; !/0 fingerprint/ { print $0 }' | awk '{ print $2 }' | sed "s_:__g" ))&#13;
+tidUsersArray=()&#13;
+&#13;
+for i in ${tidEnrolledUsers[@]}&#13;
+do&#13;
+	tidUser=$(ls -lan /Users/ | grep "$i" | awk 'BEGIN { RS="" ; FS="\n" } { print $1 }' | awk '{ print $9 }')&#13;
+	tidStatus=$(/usr/bin/sudo -u "$tidUser" /usr/bin/bioutil -r | awk '/unlock/ &amp;&amp; !/Effective/ { print $5 }')&#13;
+	[[ $tidStatus == "1" ]] &amp;&amp; tidUsersArray+=("$tidUser")&#13;
+done&#13;
+&#13;
+# Finally, print the results!&#13;
+&#13;
+if [[ -n $tidUsersArray ]]&#13;
+then&#13;
+	echo "&lt;result&gt;Active Users: $tidUsersArray&lt;/result&gt;"&#13;
+else&#13;
+	echo "&lt;result&gt;Not Enabled for Unlock&lt;/result&gt;"&#13;
+fi</scriptContentsMac>
+</extensionAttribute>
